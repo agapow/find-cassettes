@@ -1,0 +1,27 @@
+# configuration for cassette discovery pipeline
+---
+# configuration of meme motif discovery
+meme:
+   # how many seqs to use
+   num_seqs: 100
+   # number & size of motifs
+   num_motifs: 8
+   min_motif_width: 10
+   max_motif_width: 50
+
+# where to find various executables
+exe:
+   pspgen: '/Users/pagapow/Applications/Bin/meme/bin/psp-gen'
+   meme: '/Users/pagapow/Applications/Bin/meme/bin/meme'
+   mast: '/Users/pagapow/Applications/Bin/meme/bin/mast'
+
+# cassette discovery parameters
+cassettes:
+   max_gap: ~
+   max_pval: 1.0e-5
+
+# extraction of exemplar sequences
+exemplars:
+   num_seqs: 3
+
+

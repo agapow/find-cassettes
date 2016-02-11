@@ -38,9 +38,11 @@ from os import environ
 from glob import glob
 import json
 import csv
+import bisect
 
 from Bio.SeqRecord import SeqRecord
 from Bio import SeqIO
+from statsmodels.sandbox.stats.multicomp import multipletests
 
 # these are the core packages we require
 import mcda
@@ -112,7 +114,7 @@ FILTERED_CASSETTES = path.join (CASS_WORK_DIR, 'filtered-cassettes.csv')
 CASSETTE_GRAPH = path.join (CASS_WORK_DIR, 'cassettes.graphml')
 CASSETTE_GRAPH_PIC = path.join (RESULTS_DIR, 'cassettes.png')
 
-CASSETTE_DATA_FIELDS = ('datafile', 'cutoff', 'min_pval', 'pattern',
+CASSETTE_DATA_FIELDS = ('datafile', 'cutoff', 'max_pval', 'pattern',
 	'complement', 'freq', 'elements')
 
 # max pval of motif to accept when making cassettes
@@ -120,6 +122,15 @@ MAX_MOTIF_PVAL = config['cassettes']['max_pval']
 
 # summary of motifs found
 MOTIF_SUMMARY = path.join (RESULTS_DIR, 'motif-summary.csv')
+
+
+## Cassette support
+
+CASS_SUPPORT_WORK_DIR = path.join (BUILD_DIR, 'cassette-support')
+CASS_SUPPORT_MAST_XML = path.join (CASS_SUPPORT_WORK_DIR, 'mast.xml')
+CASS_SUPPORT_MAST_JSON = CASS_SUPPORT_MAST_XML.replace ('.xml', '.json')
+CASSETTES_WITH_SUPPORT = path.join (RESULTS_DIR, 'discovery-cassettes.csv')
+
 
 ## Mast search for cassettes
 MAST_WORK_DIR = path.join (BUILD_DIR, 'mast')
@@ -249,8 +260,6 @@ rule prep_data:
 		snakemake.utils.makedirs (SEQ_WORK_DIR)
 		snakemake.utils.makedirs (COMP_SEQ_WORK_DIR)
 
-		print (config)
-		
 		# copy & rename controls, sample first 100 & make non-discovery set
 		shell ("cp {input.all_cntrl_seqs} {output.all_cntrl_seqs}")
 		all_control_seqs = mcda.read_seqs (input.all_cntrl_seqs)
@@ -362,7 +371,7 @@ rule mine_for_cassettes:
 						'datafile': input.meme_results,
 						'cutoff': c,
 						# XXX: shitty column naming
-						'min_pval': MAX_MOTIF_PVAL,
+						'max_pval': MAX_MOTIF_PVAL,
 						'pattern': ''.join (r[0]),
 						'freq': r[1],
 					})
@@ -439,6 +448,76 @@ rule distill_cassette_results:
 
 		# now record them all
 		mcda.write_csv_as_dicts (uniq_cassettes, output.filtered_cassettes,
+			hdr_flds=CASSETTE_DATA_FIELDS)
+
+
+RANDOMIZATION_CNT = config['cassettes']['randomizations']
+CASSETTE_DATA_FIELDS = ('pattern', 'complement', 'frequency', 'randomizations',
+	'ramdomization_rank', 'randomization_support')
+
+
+rule calc_cassette_support:
+	message: "Randomize motif sequences to calculate cassette support"
+	input:
+		filtered_cassettes=FILTERED_CASSETTES,
+		meme_results=MEME_RESULTS,
+		mtf_disc_exp_seqs=MTF_DISC_EXP_SEQS,
+	output:
+		cassettes_with_support=CASSETTES_WITH_SUPPORT,
+		work_dir=CASS_SUPPORT_WORK_DIR,
+		mast_xml=CASS_SUPPORT_MAST_XML,
+		mast_json=CASS_SUPPORT_MAST_JSON,
+	run:
+		## Preparation:
+		snakemake.utils.makedirs (CASS_SUPPORT_WORK_DIR)
+
+		## Main:
+		# read in & organise cassettes
+		all_cassettes = mcda.read_csv_as_dicts (input.filtered_cassettes)
+		cass_dict = {c['pattern']:c for c in all_cassettes}
+
+		# run mast over all meme data
+		mcda.run_mast (input.meme_results, input.mtf_disc_exp_seqs,
+			output.work_dir, exe=MAST_EXE)
+
+		# convert to json
+		mast_data = mcda.parse_mast_results (output.mast_xml)
+		mast_data_str = json.dumps (mast_data, indent=3)
+		with open (output.mast_json, 'w') as hndl:
+			hndl.write (mast_data_str)
+
+		# randomize and look for cassettes
+		cass_support_dict = {c['pattern']:[] for c in all_cassettes}
+		uniq_cassettes = list (cass_support_dict.keys())
+
+		for i in range (RANDOMIZATION_CNT):
+			# randomize cassette
+			shuff_mast_json = mcda.randomize_mast_json (mast_data)
+			# search for every cassette in randomize data
+			for u in uniq_cassettes:
+				hits = mcda.find_cassettes_in_mast_json (u, shuff_mast_json,
+					max_gap=MAX_CASS_GAP, max_pval=MAX_CASS_PVAL)
+				# record the number of sequences with a hit
+				seq_names = [h['seq_name'] for h in hits]
+				cass_support_dict[u].append (len (set (seq_names)))
+
+		# sort support list
+		for k,v in cass_support_dict.items():
+			cass_support_dict[k] = sorted (v)
+
+		# calculate support
+		for c in all_cassettes:
+			pattern = c['pattern']
+			c['randomizations'] = RANDOMIZATION_CNT
+			rnd_list = [x / MEME_SEQ_CNT for x in cass_support_dict[pattern]]
+			cass_freq = c['cutoff']
+			# this will give the number of randomizations lower than it
+			randomization_rank = bisect.bisect_left (rnd_list, float (cass_freq))
+			randomization_support = randomization_rank / RANDOMIZATION_CNT
+			c['ramdomization_rank'] = randomization_rank
+			c['randomization_support'] = randomization_support
+
+		mcda.write_csv_as_dicts (all_cassettes, output.cassettes_with_support,
 			hdr_flds=CASSETTE_DATA_FIELDS)
 
 
@@ -649,6 +728,9 @@ rule count_cassettes:
 			summary_recs = []
 			for u in uniq_patterns:
 				hits = [x['seq_name'] for x in all_cass if x['pattern'] == u]
+				# NOTE: very important! we count the frequency (all hits) and the
+				# 'freq_seq' or the frequency of sequences containing at least 1
+				# example cassette
 				summary_recs.append ({
 					'pattern': u,
 					'freq': len (hits),
@@ -686,6 +768,8 @@ rule tabulate_cassette_counts:
 			src = mcda.get_file_name (f).replace ('.summary', '')
 			sources.append (src)
 			recs = mcda.read_csv_as_dicts (f)
+			# NOTE: this uses the frequency of sequences containing a cassette
+			# A sequence may contain more than one example of a cassette
 			freqs = {r['pattern']:r['freq_seq'] for r in recs}
 			all_freqs[src] = freqs
 
@@ -702,12 +786,14 @@ rule tabulate_cassette_counts:
 		mcda.write_csv_as_dicts (tab_recs, output.overall_cass_table,
 			hdrs)
 
+
 # even more configuration
 CNT_FLD_TMPL = '%s_seq_cnt'
 CASS_FLD_TMPL = '%s_cass_cnt'
 FRAC_FLD_TMPL = '%s_frac'
 ENR_FLD_TMPL = '%s_enr'
 PVAL_FLD_TMPL = '%s_pval'
+QVAL_FLD_TMPL = '%s_qval'
 
 CNTRL_CNT_FLD = CNT_FLD_TMPL % 'control'
 CNTRL_CASS_FLD = CASS_FLD_TMPL % 'control'
@@ -718,6 +804,7 @@ EXP_CASS_FLD = CASS_FLD_TMPL % 'experimental'
 EXP_FRAC_FLD = FRAC_FLD_TMPL % 'experimental'
 EXP_ENR_FLD = ENR_FLD_TMPL % 'experimental'
 EXP_PVAL_FLD = PVAL_FLD_TMPL % 'experimental'
+EXP_QVAL_FLD = QVAL_FLD_TMPL % 'experimental'
 
 rule make_summary_table:
 	message: "Calculate enrichment and pvals for cassettes"
@@ -744,8 +831,11 @@ rule make_summary_table:
 		cass_summaries = mcda.read_csv_as_dicts (input.overall_cass_table)
 
 		# build list of fields for output (order is important)
-		fld_list = ['cassette', CNTRL_CNT_FLD, CNTRL_CASS_FLD, CNTRL_FRAC_FLD,
-			EXP_CNT_FLD, EXP_CASS_FLD, EXP_FRAC_FLD, EXP_ENR_FLD, EXP_PVAL_FLD]
+		fld_list = ['cassette',
+			CNTRL_CNT_FLD, CNTRL_CASS_FLD, CNTRL_FRAC_FLD,
+			EXP_CNT_FLD, EXP_CASS_FLD, EXP_FRAC_FLD, EXP_ENR_FLD, EXP_PVAL_FLD,
+			EXP_QVAL_FLD
+		]
 		for k in list (seq_cnts.keys()):
 			if k not in ['control', 'experimental']:
 				fld_list.extend ([
@@ -755,7 +845,7 @@ rule make_summary_table:
 					ENR_FLD_TMPL % k,
 					PVAL_FLD_TMPL % k,
 				])
-		# mcda.prettyprint (fld_list)
+		#mcda.prettyprint (fld_list)
 
 		# init records to output with seq & cassette counts & patterns
 		cass_details = []
@@ -808,9 +898,20 @@ rule make_summary_table:
 					r[pval_fld] = mcda.enrichment_pval_via_betabinomial (r[cass_fld],
 						r[cnt_fld], r[CNTRL_CASS_FLD], r[CNTRL_CNT_FLD])
 
+		# calculate qval?
+		for c in ('experimental', 'experimental-nd'):
+			in_col = "%s_pval" % c
+			out_col = "%s_qval" % c
+			all_pvals = [r[in_col] for r in cass_details]
+			adj_pvals = multipletests (all_pvals, alpha=0.05, method='fdr_by')
+			qvals = adj_pvals[1]
+			for i in range (len (cass_details)):
+				cass_details[i][out_col] = qvals[i]
+
 		# save this all
 		mcda.write_csv_as_dicts (cass_details, output.table_with_stats,
 			fld_list)
+		#print (fld_list)
 
 		# make sub-tables for presentation purposes
 		# process data to make it better formatted
@@ -818,7 +919,7 @@ rule make_summary_table:
 			if f.endswith ('_frac') or f.endswith ('_enr'):
 				for r in cass_details:
 					r[f] = '%0.3f' % r[f]
-			if f.endswith ('_pval'):
+			if f.endswith ('_pval') or f.endswith ('_qval'):
 				for r in cass_details:
 					r[f] = '%0.3e' % r[f]
 
@@ -910,6 +1011,7 @@ rule report_results:
 		EXEMPLAR_CASS,
 		EXP_CASS_SEQS,
 		CASSETTE_GRAPH,
+		CASSETTES_WITH_SUPPORT,
 	output:
 		html=REPORT_PTH
 	run:
@@ -922,7 +1024,7 @@ rule report_results:
 		logo_rst_tmpl = """
 .. figure:: ../%(logo_path)s
 
-	Motif %(name)s (found in %(num_seq)s sequences, width %(width)s, e-value %(eval)s)
+	Motif %(name)s (found in %(num_seq)s sequences, width %(width)s bases, e-value %(eval)s)
 
 		"""
 		logo_rst_incls = [logo_rst_tmpl % {
@@ -951,12 +1053,12 @@ Input data
 
 * The control data was ``{CNTRL_SEQ_DATA}``.
 
+* The remainder of the control and experimental sequence sets not used for motif discovery is saved as "-nd".
+
 * The number of sequences in all files (including those to be used for comparative purposes) were:
 
 	.. csv-table:: All input sequences & counts
 		:file: {SEQ_CNT_PTH}
-
-* The remainder of the control and experimental sequence sets not used for motif discovery is saved in comparative sequences as "-nd".
 
 
 Analysis
@@ -988,16 +1090,22 @@ Motifs were discovered in a discriminative analysis (experimental vs. control se
 Cassette mining
 ~~~~~~~~~~~~~~~
 
-* Cassettes were discovered, using a motif p-value threshold of {MAX_MOTIF_PVAL}.
+* The discovery (MEME) results were examined for repeating motif patterns, using a motif p-value threshold of {MAX_MOTIF_PVAL}.
 
 * The following cassettes were found:
 
-	.. csv-table:: All motifs found
+	.. csv-table:: All cassettes found
 		:file: {FILTERED_CASSETTES}
 
 * In a graph, where node height is proportional to frequency and cassettes are connected to the next largest cassette that contains them:
 
 	.. image:: ../{CASSETTE_GRAPH_PIC}
+
+* By randomizing motif sequences and searching for the same cassettes, a support score was calculated:
+
+	.. csv-table:: Cassette support scores
+		:file: {CASSETTES_WITH_SUPPORT}
+
 
 
 Cassette detection in all sequences
@@ -1013,14 +1121,14 @@ Cassette detection in all sequences
 
 * The raw number of sequences with specific cassettes each dataset was:
 
-	.. csv-table:: All motifs found
+	.. csv-table:: Cassettes in all sequence sets
 		:file: {OVERALL_CASS_TABLE}
 
 
 Cassette enrichment & exemplar sequences
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* For each cassette and every sequence dataset, these are the number of sequences in the dataset, the number of sequences carrying at least one cassette and the calculated fraction:
+* For each cassette and every sequence dataset, these are the number of sequences in the dataset, the raw number and fraction of sequences carrying at least one cassette:
 
 	.. csv-table:: Cassette counts
 		:file: {CASS_COUNT_TABLE}

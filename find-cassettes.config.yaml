@@ -19,9 +19,8 @@ exe:
 cassettes:
    max_gap: ~
    max_pval: 1.0e-5
+   randomizations: 1000
 
 # extraction of exemplar sequences
 exemplars:
    num_seqs: 3
-
-

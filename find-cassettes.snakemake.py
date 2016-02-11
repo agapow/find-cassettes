@@ -159,8 +159,8 @@ CASS_HDRS = ['pattern', 'dir', 'seq_name', 'start', 'stop', 'len', 'max_gap',
 # list of experimental seqs and which cass they contain
 EXP_CASS_SEQS = path.join (RESULTS_DIR, 'exp-seqs-and-cassettes.csv')
 
-MAX_CASS_GAP = None
-MAX_CASS_PVAL = 1e-5
+MAX_CASS_GAP = config['cassettes']['max_gap']
+MAX_CASS_PVAL = config['cassettes']['max_pval']
 
 EXP_CASS_SUMMARY = EXP_CASS_ALL.replace ('.all.', '.summary.')
 CONTROL_CASS_SUMMARY = CONTROL_CASS_ALL.replace ('.all.', '.summary.')
@@ -545,6 +545,7 @@ rule calc_cassette_support:
 			hdr_flds=CASSETTE_SUPPORT_FIELDS)
 
 
+
 rule graph_cassettes:
 	message: "Draw a diagram of the cassette relationship"
 	input:
@@ -589,6 +590,7 @@ rule graph_cassettes:
 		mcda.save_graph_as_image (grf, freqs, CASSETTE_GRAPH_PIC)
 
 
+
 rule mast_search_for_elements:
 	input:
 		filtered_cassettes=FILTERED_CASSETTES,
@@ -623,6 +625,7 @@ rule mast_search_for_elements:
 			mcda.run_mast (input.meme_results, seq_file, output_dir, motif_ids=uniq_motifs_seen, exe=MAST_EXE)
 
 
+
 rule postprocess_mast_results:
 	message: "Manipulate the MAST results into a more readable form"
 	input:
@@ -654,6 +657,7 @@ rule postprocess_mast_results:
 			mast_json = json.dumps (mast_data, indent=3)
 			with open (j, 'w') as hndl:
 				hndl.write (mast_json)
+
 
 
 rule list_cassettes:
@@ -721,6 +725,7 @@ rule list_cassettes:
 				hdr_flds=hdrs, rest_val=0)
 
 
+
 rule count_cassettes:
 	message: "Process cassette hit listings to a summary form"
 	input:
@@ -761,6 +766,7 @@ rule count_cassettes:
 					'freq_seq': len (set (hits)),
 				})
 			mcda.write_csv_as_dicts (summary_recs, s, CASS_SUMMARY_HDRS)
+
 
 
 rule tabulate_cassette_counts:
@@ -1019,6 +1025,7 @@ rule extract_exemplars:
 
 		# record it
 		mcda.write_seqs (exemplar_seqs, EXEMPLAR_SEQS, 'fasta')
+
 
 
 rule report_results:

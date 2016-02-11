@@ -49,9 +49,8 @@ import mcda
 
 
 ### CONSTANTS & DEFINES
-# this is a metric fuckton of configuration
 
-# load snakemake job configfile
+# load snakemake job configfile which should have bulk of customizable steps
 configfile: "find-cassettes.config.yaml"
 
 ## Directory structure
@@ -131,6 +130,10 @@ CASS_SUPPORT_MAST_XML = path.join (CASS_SUPPORT_WORK_DIR, 'mast.xml')
 CASS_SUPPORT_MAST_JSON = CASS_SUPPORT_MAST_XML.replace ('.xml', '.json')
 CASSETTES_WITH_SUPPORT = path.join (RESULTS_DIR, 'discovery-cassettes.csv')
 
+RANDOMIZATION_CNT = config['cassettes']['randomizations']
+
+CASSETTE_SUPPORT_FIELDS = ('pattern', 'complement', 'frequency',
+	'randomizations', 'ramdomization_rank', 'randomization_support')
 
 ## Mast search for cassettes
 MAST_WORK_DIR = path.join (BUILD_DIR, 'mast')
@@ -170,6 +173,10 @@ CASS_ENRICHMENT_TABLE = OVERALL_CASS_TABLE_WITH_STATS.replace ('.with-stats.', '
 CASS_COUNT_TABLE = OVERALL_CASS_TABLE_WITH_STATS.replace ('.with-stats.', '.counts.')
 
 ## Exemplar sequences
+
+# how many examples of each to gather
+NUM_EXEMPLARS = config['exemplars']['num_seqs']
+
 EXEMPLAR_CASS= path.join (RESULTS_DIR, 'exemplars.csv')
 EXEMPLAR_SEQS = path.join (RESULTS_DIR, 'exemplars.fasta')
 
@@ -201,6 +208,11 @@ def assert_num_seqs_in_file (pth, cnt):
 	assert count_seqs_in_file (pth) == cnt, \
 		"incorrect number of sequences in file '%s', should be %s" % (
 			pth, cnt)
+
+
+def get_names_of_seqs_in_file (pth):
+	all_seqs = mcda.read_seqs (pth)
+	return [s.name for s in all_seqs]
 
 
 
@@ -243,15 +255,31 @@ rule prep_data:
 
 		# have they provided only 1 experimental & control sequence
 		assert len (glob (path.join (EXP_SEQ_DATA_DIR, '*.fasta'))) == 1, \
-			"more than 1 experimental sequence file provided"
+			"need 1 and only 1 experimental sequence file in fasta format"
 		assert len (glob (path.join (CNTRL_SEQ_DATA_DIR, '*.fasta'))) == 1, \
-			"more than 1 control sequence file provided"
+			"need 1 and only 1 control sequence file in fasta format"
 
 		# have they provided enough of each type of sequence?
 		assert MEME_SEQ_CNT < count_seqs_in_file (input.all_exp_seqs), \
 			"need at least %s experimental sequences" % MEME_SEQ_CNT
 		assert MEME_SEQ_CNT < count_seqs_in_file (input.all_cntrl_seqs), \
 			"need at least %s control sequences" % MEME_SEQ_CNT
+
+		# check seq names
+		raw_exp_seq_names = get_names_of_seqs_in_file (input.all_exp_seqs)
+		exp_seq_names = frozenset (raw_exp_seq_names)
+		assert len (raw_exp_seq_names) == len (exp_seq_names), \
+			"there are duplicate sequence names in the experimental set"
+
+		raw_cntrl_seq_names = get_names_of_seqs_in_file (input.all_cntrl_seqs)
+		cntrl_seq_names = frozenset (raw_cntrl_seq_names)
+		assert len (raw_cntrl_seq_names) == len (cntrl_seq_names), \
+			"there are duplicate sequence names in the control set"
+
+		overlap = exp_seq_names.intersection (cntrl_seq_names)
+		assert len (overlap) == 0, \
+			"some sequences appear in experimental and control sets: %s" % \
+			', '.join (overlap)
 
 		## Main:
 		# create required directories
@@ -451,10 +479,6 @@ rule distill_cassette_results:
 			hdr_flds=CASSETTE_DATA_FIELDS)
 
 
-RANDOMIZATION_CNT = config['cassettes']['randomizations']
-CASSETTE_DATA_FIELDS = ('pattern', 'complement', 'frequency', 'randomizations',
-	'ramdomization_rank', 'randomization_support')
-
 
 rule calc_cassette_support:
 	message: "Randomize motif sequences to calculate cassette support"
@@ -518,7 +542,7 @@ rule calc_cassette_support:
 			c['randomization_support'] = randomization_support
 
 		mcda.write_csv_as_dicts (all_cassettes, output.cassettes_with_support,
-			hdr_flds=CASSETTE_DATA_FIELDS)
+			hdr_flds=CASSETTE_SUPPORT_FIELDS)
 
 
 rule graph_cassettes:
@@ -787,24 +811,6 @@ rule tabulate_cassette_counts:
 			hdrs)
 
 
-# even more configuration
-CNT_FLD_TMPL = '%s_seq_cnt'
-CASS_FLD_TMPL = '%s_cass_cnt'
-FRAC_FLD_TMPL = '%s_frac'
-ENR_FLD_TMPL = '%s_enr'
-PVAL_FLD_TMPL = '%s_pval'
-QVAL_FLD_TMPL = '%s_qval'
-
-CNTRL_CNT_FLD = CNT_FLD_TMPL % 'control'
-CNTRL_CASS_FLD = CASS_FLD_TMPL % 'control'
-CNTRL_FRAC_FLD = FRAC_FLD_TMPL % 'control'
-
-EXP_CNT_FLD = CNT_FLD_TMPL % 'experimental'
-EXP_CASS_FLD = CASS_FLD_TMPL % 'experimental'
-EXP_FRAC_FLD = FRAC_FLD_TMPL % 'experimental'
-EXP_ENR_FLD = ENR_FLD_TMPL % 'experimental'
-EXP_PVAL_FLD = PVAL_FLD_TMPL % 'experimental'
-EXP_QVAL_FLD = QVAL_FLD_TMPL % 'experimental'
 
 rule make_summary_table:
 	message: "Calculate enrichment and pvals for cassettes"
@@ -816,6 +822,27 @@ rule make_summary_table:
 		enrichment_table=CASS_ENRICHMENT_TABLE,
 		count_table=CASS_COUNT_TABLE,
 	run:
+		## Constants:
+		# define the form of headers for convenience
+		CNT_FLD_TMPL = '%s_seq_cnt'
+		CASS_FLD_TMPL = '%s_cass_cnt'
+		FRAC_FLD_TMPL = '%s_frac'
+		ENR_FLD_TMPL = '%s_enr'
+		PVAL_FLD_TMPL = '%s_pval'
+		QVAL_FLD_TMPL = '%s_qval'
+
+		CNTRL_CNT_FLD = CNT_FLD_TMPL % 'control'
+		CNTRL_CASS_FLD = CASS_FLD_TMPL % 'control'
+		CNTRL_FRAC_FLD = FRAC_FLD_TMPL % 'control'
+
+		EXP_CNT_FLD = CNT_FLD_TMPL % 'experimental'
+		EXP_CASS_FLD = CASS_FLD_TMPL % 'experimental'
+		EXP_FRAC_FLD = FRAC_FLD_TMPL % 'experimental'
+		EXP_ENR_FLD = ENR_FLD_TMPL % 'experimental'
+		EXP_PVAL_FLD = PVAL_FLD_TMPL % 'experimental'
+		EXP_QVAL_FLD = QVAL_FLD_TMPL % 'experimental'
+
+		## Main:
 		# get counts of all types of sequences
 		seq_cnt_recs = mcda.read_csv_as_dicts (input.seq_cnts)
 		seq_cnts = {}
@@ -935,9 +962,6 @@ rule make_summary_table:
 			enr_fld_list)
 
 
-
-# how many examples of each to gather
-NUM_EXEMPLARS = config['exemplars']['num_seqs']
 
 rule extract_exemplars:
 	message: "Extract best examples of cassette sequences from experimental data"
@@ -1150,9 +1174,6 @@ Cassette enrichment & exemplar sequences
 		  	defaultenc='utf8',
 			stylesheet=path.join(REPORT_DATA_DIR, 'report.css'),
 			files=input)
-
-
-
 
 
 

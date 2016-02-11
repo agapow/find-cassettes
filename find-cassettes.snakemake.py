@@ -1132,7 +1132,7 @@ Cassette mining
 
 	.. image:: ../{CASSETTE_GRAPH_PIC}
 
-* By randomizing motif sequences and searching for the same cassettes, a support score was calculated:
+* By randomizing the sequence of motifs and searching for the same cassettes, a support score was calculated:
 
 	.. csv-table:: Cassette support scores
 		:file: {CASSETTES_WITH_SUPPORT}
@@ -1174,13 +1174,12 @@ Cassette enrichment & exemplar sequences
 	.. csv-table:: Best sequence for each cassette
 		:file: {EXEMPLAR_CASS}
 
-
-
-        """ % {'logo_text': logo_rst_incl_txt},
-		  output.html,
-		  	defaultenc='utf8',
+		""" % {'logo_text': logo_rst_incl_txt},
+			output.html,
+			defaultenc='utf8',
 			stylesheet=path.join(REPORT_DATA_DIR, 'report.css'),
-			files=input)
+			files=input
+		)
 
 
 

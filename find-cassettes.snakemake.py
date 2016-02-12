@@ -167,7 +167,7 @@ MAX_CASS_PVAL = config['cassettes']['max_pval']
 EXP_CASS_SUMMARY = EXP_CASS_ALL.replace ('.all.', '.summary.')
 CONTROL_CASS_SUMMARY = CONTROL_CASS_ALL.replace ('.all.', '.summary.')
 
-CASS_SUMMARY_HDRS = ['pattern', 'freq', 'freq_seq', 'mean_cassettes',
+CASS_SUMMARY_HDRS = ['pattern', 'num_cassettes', 'num_seqs_with_cassettes', 'mean_cassettes',
 	'mean_cassette_dose']
 
 OVERALL_CASS_TABLE = path.join (CASS_WORK_DIR, 'all-cassettes-table.csv')
@@ -781,7 +781,7 @@ rule count_cassettes:
 			for u in uniq_patterns:
 				hits = [x['seq_name'] for x in all_cass if x['pattern'] == u]
 				# NOTE: very important! we count the frequency (all hits) and the
-				# 'freq_seq' or the frequency of sequences containing at least 1
+				# 'num_seqs_with_cassettes' or the frequency of sequences containing at least 1
 				# example cassette
 				num_hits = len (hits)
 				num_seqs_with_hits = len (set (hits))
@@ -792,8 +792,8 @@ rule count_cassettes:
 				mean_cass_dose = sum_cass / num_seqs_with_hits
 				summary_recs.append ({
 					'pattern': u,
-					'freq': num_hits,
-					'freq_seq': num_seqs_with_hits,
+					'num_cassettes': num_hits,
+					'num_seqs_with_cassettes': num_seqs_with_hits,
 					'mean_cassettes': mean_cass,
 					'mean_cassette_dose': mean_cass_dose,
 				})
@@ -832,7 +832,7 @@ rule tabulate_cassette_counts:
 			recs = mcda.read_csv_as_dicts (f)
 			# NOTE: this uses the frequency of sequences containing a cassette
 			# A sequence may contain more than one example of a cassette
-			freqs = {r['pattern']:r['freq_seq'] for r in recs}
+			freqs = {r['pattern']:r['num_seqs_with_cassettes'] for r in recs}
 			all_freqs[src] = freqs
 
 		# tabulate

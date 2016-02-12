@@ -1,6 +1,10 @@
 """
 Do motif cassette discovery on sequences - a pipelined version.
 
+Author: Paul Agapow <p.agapow@imperial.ac.uk>
+Date: 2016/02/12
+Run: snakemake -s find-cassettes.snakemake.py
+
 This pipeline trys to be as agnostic as possible about the sequence data that
 are used within it. To lay out in plain English the expectations for this analysis:
 
@@ -24,9 +28,8 @@ Various notes:
 	named - 'control'. Likewise, the experimental data is always called
 	'experimental'.
 * All sequence files are FASTA-formatted.
-* The initial step (MEME analysis) uses just 100 sequences, regardless of how
-	many are supplied. These will be taken as the first 100 of the control and
-	experimental sequence files. They should therefore be ordered appropriately.
+* The initial step (MEME analysis) uses a configurable subset of the sequences, regardless of how many are supplied. These will be taken as the first X sequences of the control and experimental files. They should therefore be ordered appropriately.
+* Configurable details are found in the accompanying `.config.yaml` file.
 
 """
 
@@ -53,13 +56,16 @@ import mcda
 ### CONSTANTS & DEFINES
 
 # load snakemake job configfile which should have bulk of customizable steps
-configfile: "find-cassettes.config.yaml"
+configfile: 'find-cassettes.config.yaml'
 
 ## Directory structure
 # various directories seperating our work
 DATA_DIR = 'data'
 BUILD_DIR = 'build'
 RESULTS_DIR = 'results'
+
+# Validation of data
+VALIDATION_FLAG = path.join (BUILD_DIR, 'validation.done')
 
 ## Location of sequence data
 # where to find the original sequence data
@@ -77,12 +83,12 @@ COMP_SEQ_WORK_DIR = path.join (SEQ_WORK_DIR, 'comparative')
 ALL_COMP_SEQ_DATA = glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta'))
 
 ALL_CONTROL_SEQS = path.join (SEQ_WORK_DIR, 'all-control.fasta')
-MTF_DISC_CONTROL_SEQS = path.join (SEQ_WORK_DIR, 'first100-control.fasta')
-NONDISC_CONTROL_SEQS = path.join (COMP_SEQ_WORK_DIR, 'control-nd.fasta')
+MTF_DISC_CONTROL_SEQS = path.join (SEQ_WORK_DIR, 'control-disc.fasta')
+NONDISC_CONTROL_SEQS = path.join (COMP_SEQ_WORK_DIR, 'control-nondisc.fasta')
 
 ALL_EXP_SEQS = path.join (SEQ_WORK_DIR, 'all-experimental.fasta')
-MTF_DISC_EXP_SEQS = path.join (SEQ_WORK_DIR, 'first100-experimental.fasta')
-NONDISC_EXP_SEQS = path.join (COMP_SEQ_WORK_DIR, 'experimental-nd.fasta')
+MTF_DISC_EXP_SEQS = path.join (SEQ_WORK_DIR, 'experimental-disc.fasta')
+NONDISC_EXP_SEQS = path.join (COMP_SEQ_WORK_DIR, 'experimental-nondisc.fasta')
 
 
 SEQ_CNT_PTH = path.join (BUILD_DIR, 'seq_cnts.csv')
@@ -204,15 +210,6 @@ def count_seqs_in_file (pth):
 	return len (all_seqs)
 
 
-def assert_num_seqs_in_file (pth, cnt):
-	"""
-	Checking we have the expected number of sequences in each file.
-	"""
-	assert count_seqs_in_file (pth) == cnt, \
-		"incorrect number of sequences in file '%s', should be %s" % (
-			pth, cnt)
-
-
 def get_names_of_seqs_in_file (pth):
 	all_seqs = mcda.read_seqs (pth)
 	return [s.name for s in all_seqs]
@@ -225,6 +222,8 @@ rule all:
 	input:
 		REPORT_PTH
 
+
+
 rule clean:
 	message: "Delete all built / produced files, leave original data"
 	shell:
@@ -234,23 +233,33 @@ rule clean:
 		"""
 
 
+
+rule custom_validation:
+	message: "Running customisable validation"
+	input:
+		exp_seq_data=EXP_SEQ_DATA,
+		cntrl_seq_data=CNTRL_SEQ_DATA,
+	output: touch (VALIDATION_FLAG)
+	script: 'scripts/validate-data.py'
+
+
+
 rule prep_data:
 	message: "Check & prep all the data we need for this pipeline."
 	input:
+		data_good=VALIDATION_FLAG,
 		all_exp_seqs=EXP_SEQ_DATA,
 		all_cntrl_seqs=CNTRL_SEQ_DATA,
 		comp_seq_data_dir=COMP_SEQ_DATA_DIR,
 	output:
-		all_exp_seqs=ALL_EXP_SEQS,
-		mtf_disc_exp_seqs=MTF_DISC_EXP_SEQS,
+		disc_exp_seqs=MTF_DISC_EXP_SEQS,
 		nondisc_exp_seqs=NONDISC_EXP_SEQS,
-		all_cntrl_seqs=ALL_CONTROL_SEQS,
-		mtf_disc_cntrl_seqs=MTF_DISC_CONTROL_SEQS,
+		disc_cntrl_seqs=MTF_DISC_CONTROL_SEQS,
 		nondisc_control_seqs=NONDISC_CONTROL_SEQS,
 		comp_seq_work_dir=COMP_SEQ_WORK_DIR,
 	run:
 		## Preconditions:
-		# have they provide dinput sequences?
+		# have they provided input sequences?
 		assert path.exists (input.all_exp_seqs), \
 			"no experimental sequences provided"
 		assert path.exists (input.all_cntrl_seqs), \
@@ -292,24 +301,23 @@ rule prep_data:
 		snakemake.utils.makedirs (COMP_SEQ_WORK_DIR)
 
 		# copy & rename controls, sample first 100 & make non-discovery set
-		shell ("cp {input.all_cntrl_seqs} {output.all_cntrl_seqs}")
 		all_control_seqs = mcda.read_seqs (input.all_cntrl_seqs)
 		mcda.write_seqs (all_control_seqs[:MEME_SEQ_CNT],
-			output.mtf_disc_cntrl_seqs)
+			output.disc_cntrl_seqs)
 		mcda.write_seqs (all_control_seqs[MEME_SEQ_CNT:],
 			output.nondisc_control_seqs)
 
 		# copy & rename experimental, take top 100 & make non-discovery set
 		# NOTE: assumes exp seqs are in order of effect
-		shell ("cp {input.all_exp_seqs} {output.all_exp_seqs}")
 		all_exp_seqs = mcda.read_seqs (input.all_exp_seqs)
 		mcda.write_seqs (all_exp_seqs[:MEME_SEQ_CNT],
-			output.mtf_disc_exp_seqs)
+			output.disc_exp_seqs)
 		mcda.write_seqs (all_exp_seqs[MEME_SEQ_CNT:],
 			output.nondisc_exp_seqs)
 
 		# copy all comparative seqs across
 		shell ("cp {input.comp_seq_data_dir}/*.fasta {output.comp_seq_work_dir}")
+
 
 
 rule count_seqs:
@@ -362,16 +370,12 @@ rule prep_discrim_meme_search:
 rule meme_search:
 	message: "Looking for motifs with MEME using previous priors"
 	input:
-		top100_exp_seqs=MTF_DISC_EXP_SEQS,
+		disc_exp_seqs=MTF_DISC_EXP_SEQS,
 		meme_priors=MEME_PRIORS,
 	output:
 		meme_results=MEME_RESULTS,
 	run:
-		## Preconditions:
-		assert_num_seqs_in_file (input.top100_exp_seqs, MEME_SEQ_CNT)
-
-		## Main:
-		mcda.run_meme (input.top100_exp_seqs, MEME_WORK_DIR,
+		mcda.run_meme (input.disc_exp_seqs, MEME_WORK_DIR,
 			input.meme_priors,
 			nmotifs=NUM_MOTIFS, minw=MIN_MOTIF_WIDTH, maxw=MAX_MOTIF_WIDTH,
 				exe=MEME_EXE)
@@ -509,7 +513,7 @@ rule calc_cassette_support:
 		cass_dict = {c['pattern']:c for c in all_cassettes}
 
 		# run mast over all meme data
-		mcda.run_mast (input.meme_results, input.mtf_disc_exp_seqs,
+		mcda.run_mast (input.meme_results, input.disc_exp_seqs,
 			output.work_dir, exe=MAST_EXE)
 
 		# convert to json
@@ -599,7 +603,8 @@ rule graph_cassettes:
 
 
 
-rule mast_search_for_elements:
+rule mast_search_for_motifs:
+	message: "Search non-discovery & comparative data for motifs"
 	input:
 		filtered_cassettes=FILTERED_CASSETTES,
 		all_exp_seqs=ALL_EXP_SEQS,

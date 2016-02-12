@@ -40,6 +40,7 @@ import json
 import csv
 import bisect
 from collections import Counter
+import re
 
 from Bio.SeqRecord import SeqRecord
 from Bio import SeqIO
@@ -739,6 +740,7 @@ rule count_cassettes:
 		filtered_cassettes=FILTERED_CASSETTES,
 		exp_cass_all=EXP_CASS_ALL,
 		control_cass_all=CONTROL_CASS_ALL,
+		seq_cnts=SEQ_CNT_PTH,
 	output:
 		exp_cass_summary=EXP_CASS_SUMMARY,
 		control_cass_summary=CONTROL_CASS_SUMMARY,
@@ -759,30 +761,39 @@ rule count_cassettes:
 		seq_cnts = {}
 		for r in mcda.read_csv_as_dicts (input.seq_cnts):
 			name = r['name'].replace ('all-', '')
-			seq_cnts[name] = r['count']
+			seq_cnts[name] = int (r['count'])
 
 		# do actual analysis
 		uniq_cassettes = mcda.read_csv_as_dicts (input.filtered_cassettes)
 		uniq_patterns = [r['pattern'] for r in uniq_cassettes]
 
+		name_re = re.compile ('([^/]+)\.all\.csv$')
+
 		for a, s in ANALYSES:
 			all_cass = mcda.read_csv_as_dicts (a)
 			summary_recs = []
+			# NOTE: this is a super hacky way to find out which dataset we are
+			# looking at. There much be a better way, probably with wildcards
+			name_match = name_re.search (a)
+			assert (name_match), "can't extract analysis name from '%s'" % name_match
+			analysis_name = name_match.group(1)
+
 			for u in uniq_patterns:
 				hits = [x['seq_name'] for x in all_cass if x['pattern'] == u]
 				# NOTE: very important! we count the frequency (all hits) and the
 				# 'freq_seq' or the frequency of sequences containing at least 1
 				# example cassette
-				freq = len (hits)
-				freq_seq = len (set (hits))
+				num_hits = len (hits)
+				num_seqs_with_hits = len (set (hits))
+				num_seqs = seq_cnts[analysis_name]
 				tally = Counter (hits)
 				sum_cass = sum (list (tally.values()))
-				mean_cass = sum_cass / freq
-				mean_cass_dose = sum_cass / freq_seq
+				mean_cass = sum_cass / num_seqs
+				mean_cass_dose = sum_cass / num_seqs_with_hits
 				summary_recs.append ({
 					'pattern': u,
-					'freq': freq,
-					'freq_seq': freq_seq,
+					'freq': num_hits,
+					'freq_seq': num_seqs_with_hits,
 					'mean_cassettes': mean_cass,
 					'mean_cassette_dose': mean_cass_dose,
 				})

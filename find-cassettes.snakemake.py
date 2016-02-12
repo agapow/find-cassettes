@@ -39,6 +39,7 @@ from glob import glob
 import json
 import csv
 import bisect
+from collections import Counter
 
 from Bio.SeqRecord import SeqRecord
 from Bio import SeqIO
@@ -165,7 +166,8 @@ MAX_CASS_PVAL = config['cassettes']['max_pval']
 EXP_CASS_SUMMARY = EXP_CASS_ALL.replace ('.all.', '.summary.')
 CONTROL_CASS_SUMMARY = CONTROL_CASS_ALL.replace ('.all.', '.summary.')
 
-CASS_SUMMARY_HDRS = ['pattern', 'freq', 'freq_seq']
+CASS_SUMMARY_HDRS = ['pattern', 'freq', 'freq_seq', 'mean_cassettes',
+	'mean_cassette_dose']
 
 OVERALL_CASS_TABLE = path.join (CASS_WORK_DIR, 'all-cassettes-table.csv')
 OVERALL_CASS_TABLE_WITH_STATS = path.join (RESULTS_DIR, 'all-cassettes.with-stats.csv')
@@ -314,6 +316,11 @@ rule count_seqs:
 	input:
 		all_exp_seqs=ALL_EXP_SEQS,
 		all_cntrl_seqs=ALL_CONTROL_SEQS,
+		mtf_disc_exp_seqs=MTF_DISC_EXP_SEQS,
+		nondisc_exp_seqs=NONDISC_EXP_SEQS,
+		mtf_disc_cntrl_seqs=MTF_DISC_CONTROL_SEQS,
+		nondisc_control_seqs=NONDISC_CONTROL_SEQS,
+		comp_seq_work_dir=COMP_SEQ_WORK_DIR,
 	output:
 		seq_cnt_pth=SEQ_CNT_PTH
 	run:
@@ -727,7 +734,7 @@ rule list_cassettes:
 
 
 rule count_cassettes:
-	message: "Process cassette hit listings to a summary form"
+	message: "Summarize cassette hit listings"
 	input:
 		filtered_cassettes=FILTERED_CASSETTES,
 		exp_cass_all=EXP_CASS_ALL,
@@ -748,6 +755,12 @@ rule count_cassettes:
 			ANALYSES.append ((pth, summary_pth))
 
 		## Main:
+		# get counts of all types of sequences
+		seq_cnts = {}
+		for r in mcda.read_csv_as_dicts (input.seq_cnts):
+			name = r['name'].replace ('all-', '')
+			seq_cnts[name] = r['count']
+
 		# do actual analysis
 		uniq_cassettes = mcda.read_csv_as_dicts (input.filtered_cassettes)
 		uniq_patterns = [r['pattern'] for r in uniq_cassettes]
@@ -760,10 +773,18 @@ rule count_cassettes:
 				# NOTE: very important! we count the frequency (all hits) and the
 				# 'freq_seq' or the frequency of sequences containing at least 1
 				# example cassette
+				freq = len (hits)
+				freq_seq = len (set (hits))
+				tally = Counter (hits)
+				sum_cass = sum (list (tally.values()))
+				mean_cass = sum_cass / freq
+				mean_cass_dose = sum_cass / freq_seq
 				summary_recs.append ({
 					'pattern': u,
-					'freq': len (hits),
-					'freq_seq': len (set (hits)),
+					'freq': freq,
+					'freq_seq': freq_seq,
+					'mean_cassettes': mean_cass,
+					'mean_cassette_dose': mean_cass_dose,
 				})
 			mcda.write_csv_as_dicts (summary_recs, s, CASS_SUMMARY_HDRS)
 
@@ -935,6 +956,7 @@ rule make_summary_table:
 		for c in ('experimental', 'experimental-nd'):
 			in_col = "%s_pval" % c
 			out_col = "%s_qval" % c
+			print (r)
 			all_pvals = [r[in_col] for r in cass_details]
 			adj_pvals = multipletests (all_pvals, alpha=0.05, method='fdr_by')
 			qvals = adj_pvals[1]

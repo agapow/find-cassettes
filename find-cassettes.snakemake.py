@@ -607,8 +607,8 @@ rule mast_search_for_motifs:
 	message: "Search non-discovery & comparative data for motifs"
 	input:
 		filtered_cassettes=FILTERED_CASSETTES,
-		all_exp_seqs=ALL_EXP_SEQS,
-		all_control_seqs=ALL_CONTROL_SEQS,
+		exp_seqs=NONDISC_EXP_SEQS,
+		control_seqs=NONDISC_CONTROL_SEQS,
 		meme_results=MEME_RESULTS,
 	output:
 		EXP_MAST_RES_DIR,
@@ -619,8 +619,8 @@ rule mast_search_for_motifs:
 		## Constants:
 		# build list of data to analyse & where results go
 		ANALYSES = [
-			(input.all_exp_seqs, EXP_MAST_RES_DIR),
-			(input.all_control_seqs, CONTROL_MAST_RES_DIR),
+			(input.exp_seqs, EXP_MAST_RES_DIR),
+			(input.control_seqs, CONTROL_MAST_RES_DIR),
 		]
 
 		for pth in glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta')):

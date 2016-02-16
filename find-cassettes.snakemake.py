@@ -64,6 +64,18 @@ DATA_DIR = 'data'
 BUILD_DIR = 'build'
 RESULTS_DIR = 'results'
 
+## Standard / magic names
+# so we can get consistency of naming across analysis
+EXP_SUFF = 'experimental'
+CNTRL_SUFF = 'control'
+DISC_PREF = 'disc'
+NONDISC_PREF = 'nondisc'
+DISC_EXP_NAME = '%s-%s' % (EXP_SUFF, DISC_PREF)
+NONDISC_EXP_NAME = '%s-%s' % (EXP_SUFF, NONDISC_PREF)
+DISC_CNTRL_NAME = '%s-%s' % (CNTRL_SUFF, DISC_PREF)
+NONDISC_CNTRL_NAME = '%s-%s' % (CNTRL_SUFF, NONDISC_PREF)
+
+
 # Validation of data
 VALIDATION_FLAG = path.join (BUILD_DIR, 'validation.done')
 
@@ -82,11 +94,9 @@ SEQ_WORK_DIR = path.join (BUILD_DIR, 'seqs')
 COMP_SEQ_WORK_DIR = path.join (SEQ_WORK_DIR, 'comparative')
 ALL_COMP_SEQ_DATA = glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta'))
 
-ALL_CONTROL_SEQS = path.join (SEQ_WORK_DIR, 'all-control.fasta')
 MTF_DISC_CONTROL_SEQS = path.join (SEQ_WORK_DIR, 'control-disc.fasta')
 NONDISC_CONTROL_SEQS = path.join (COMP_SEQ_WORK_DIR, 'control-nondisc.fasta')
 
-ALL_EXP_SEQS = path.join (SEQ_WORK_DIR, 'all-experimental.fasta')
 MTF_DISC_EXP_SEQS = path.join (SEQ_WORK_DIR, 'experimental-disc.fasta')
 NONDISC_EXP_SEQS = path.join (COMP_SEQ_WORK_DIR, 'experimental-nondisc.fasta')
 
@@ -146,8 +156,8 @@ CASSETTE_SUPPORT_FIELDS = ('pattern', 'complement', 'frequency',
 ## Mast search for cassettes
 MAST_WORK_DIR = path.join (BUILD_DIR, 'mast')
 
-EXP_MAST_RES_DIR = path.join (MAST_WORK_DIR, 'experimental')
-CONTROL_MAST_RES_DIR = path.join (MAST_WORK_DIR, 'control')
+EXP_MAST_RES_DIR = path.join (MAST_WORK_DIR, DISC_EXP_NAME)
+CONTROL_MAST_RES_DIR = path.join (MAST_WORK_DIR, DISC_CNTRL_NAME)
 COMPARATIVE_MAST_RES_DIR = path.join (MAST_WORK_DIR, 'comparative')
 
 EXP_MAST_RES = path.join (EXP_MAST_RES_DIR, 'mast.xml')
@@ -156,8 +166,8 @@ CONTROL_MAST_RES = path.join (CONTROL_MAST_RES_DIR, 'mast.xml')
 EXP_MAST_JSON = EXP_MAST_RES.replace ('.xml', '.json')
 CONTROL_MAST_JSON = CONTROL_MAST_RES.replace ('.xml', '.json')
 
-EXP_CASS_ALL = path.join (CASS_WORK_DIR, 'experimental.all.csv')
-CONTROL_CASS_ALL = path.join (CASS_WORK_DIR, 'control.all.csv')
+EXP_CASS_ALL = path.join (CASS_WORK_DIR, DISC_EXP_NAME + '.all.csv')
+CONTROL_CASS_ALL = path.join (CASS_WORK_DIR, DISC_CNTRL_NAME + '.all.csv')
 COMPARATIVE_CASS_DIR = path.join (CASS_WORK_DIR, 'comparative')
 
 CASS_HDRS = ['pattern', 'dir', 'seq_name', 'start', 'stop', 'len', 'max_gap',
@@ -323,11 +333,9 @@ rule prep_data:
 rule count_seqs:
 	message: "Count the number of sequences in every file"
 	input:
-		all_exp_seqs=ALL_EXP_SEQS,
-		all_cntrl_seqs=ALL_CONTROL_SEQS,
-		mtf_disc_exp_seqs=MTF_DISC_EXP_SEQS,
+		disc_exp_seqs=MTF_DISC_EXP_SEQS,
 		nondisc_exp_seqs=NONDISC_EXP_SEQS,
-		mtf_disc_cntrl_seqs=MTF_DISC_CONTROL_SEQS,
+		disc_cntrl_seqs=MTF_DISC_CONTROL_SEQS,
 		nondisc_control_seqs=NONDISC_CONTROL_SEQS,
 		comp_seq_work_dir=COMP_SEQ_WORK_DIR,
 	output:
@@ -335,8 +343,8 @@ rule count_seqs:
 	run:
 		# XXX: this is where a lot of naming stuff can come acrop
 		ALL_SEQ_FILES = ALL_COMP_SEQ_DATA + [
-			input.all_exp_seqs,
-			input.all_cntrl_seqs,
+			input.disc_exp_seqs,
+			input.disc_cntrl_seqs,
 		]
 
 		cnts = []
@@ -497,7 +505,7 @@ rule calc_cassette_support:
 	input:
 		filtered_cassettes=FILTERED_CASSETTES,
 		meme_results=MEME_RESULTS,
-		mtf_disc_exp_seqs=MTF_DISC_EXP_SEQS,
+		disc_exp_seqs=MTF_DISC_EXP_SEQS,
 	output:
 		cassettes_with_support=CASSETTES_WITH_SUPPORT,
 		work_dir=CASS_SUPPORT_WORK_DIR,
@@ -765,7 +773,7 @@ rule count_cassettes:
 		# get counts of all types of sequences
 		seq_cnts = {}
 		for r in mcda.read_csv_as_dicts (input.seq_cnts):
-			name = r['name'].replace ('all-', '')
+			name = r['name']
 			seq_cnts[name] = int (r['count'])
 
 		# do actual analysis
@@ -874,16 +882,16 @@ rule make_summary_table:
 		PVAL_FLD_TMPL = '%s_pval'
 		QVAL_FLD_TMPL = '%s_qval'
 
-		CNTRL_CNT_FLD = CNT_FLD_TMPL % 'control'
-		CNTRL_CASS_FLD = CASS_FLD_TMPL % 'control'
-		CNTRL_FRAC_FLD = FRAC_FLD_TMPL % 'control'
+		CNTRL_CNT_FLD = CNT_FLD_TMPL % NONDISC_CNTRL_NAME
+		CNTRL_CASS_FLD = CASS_FLD_TMPL % NONDISC_CNTRL_NAME
+		CNTRL_FRAC_FLD = FRAC_FLD_TMPL % NONDISC_CNTRL_NAME
 
-		EXP_CNT_FLD = CNT_FLD_TMPL % 'experimental'
-		EXP_CASS_FLD = CASS_FLD_TMPL % 'experimental'
-		EXP_FRAC_FLD = FRAC_FLD_TMPL % 'experimental'
-		EXP_ENR_FLD = ENR_FLD_TMPL % 'experimental'
-		EXP_PVAL_FLD = PVAL_FLD_TMPL % 'experimental'
-		EXP_QVAL_FLD = QVAL_FLD_TMPL % 'experimental'
+		EXP_CNT_FLD = CNT_FLD_TMPL % NONDISC_EXP_NAME
+		EXP_CASS_FLD = CASS_FLD_TMPL % NONDISC_EXP_NAME
+		EXP_FRAC_FLD = FRAC_FLD_TMPL % NONDISC_EXP_NAME
+		EXP_ENR_FLD = ENR_FLD_TMPL % NONDISC_EXP_NAME
+		EXP_PVAL_FLD = PVAL_FLD_TMPL % NONDISC_EXP_NAME
+		EXP_QVAL_FLD = QVAL_FLD_TMPL % NONDISC_EXP_NAME
 
 		## Main:
 		# get counts of all types of sequences
@@ -907,7 +915,7 @@ rule make_summary_table:
 			EXP_QVAL_FLD
 		]
 		for k in list (seq_cnts.keys()):
-			if k not in ['control', 'experimental']:
+			if k not in [NONDISC_EXP_NAME, NONDISC_CNTRL_NAME]:
 				fld_list.extend ([
 					CNT_FLD_TMPL % k,
 					CASS_FLD_TMPL % k,
@@ -956,7 +964,7 @@ rule make_summary_table:
 
 		# calculate enrichment & pval
 		for src in seq_cnts.keys():
-			if src != 'control':
+			if src != NONDISC_CNTRL_NAME:
 				cnt_fld = CNT_FLD_TMPL % src
 				cass_fld = CASS_FLD_TMPL % src
 				frac_fld = FRAC_FLD_TMPL % src
@@ -964,12 +972,18 @@ rule make_summary_table:
 				pval_fld = PVAL_FLD_TMPL % src
 
 				for r in cass_details:
-					r[enr_fld] = r[frac_fld] / r[CNTRL_FRAC_FLD]
-					r[pval_fld] = mcda.enrichment_pval_via_betabinomial (r[cass_fld],
-						r[cnt_fld], r[CNTRL_CASS_FLD], r[CNTRL_CNT_FLD])
+					try:
+						r[enr_fld] = r[frac_fld] / r[CNTRL_FRAC_FLD]
+						r[pval_fld] = mcda.enrichment_pval_via_betabinomial (
+							r[cass_fld], r[cnt_fld], r[CNTRL_CASS_FLD],
+							r[CNTRL_CNT_FLD]
+						)
+					except:
+						mcda.prettyprint (r)
+						raise
 
 		# calculate qval?
-		for c in ('experimental', 'experimental-nd'):
+		for c in (NONDISC_EXP_NAME,):
 			in_col = "%s_pval" % c
 			out_col = "%s_qval" % c
 			print (r)
@@ -1010,14 +1024,14 @@ rule make_summary_table:
 rule extract_exemplars:
 	message: "Extract best examples of cassette sequences from experimental data"
 	input:
-		all_exp_seqs=ALL_EXP_SEQS,
+		exp_seqs=NONDISC_EXP_SEQS,
 		all_exp_cass=EXP_CASS_ALL,
 	output:
 		exemplar_cass=EXEMPLAR_CASS,
 		exemplar_seqs=EXEMPLAR_SEQS,
 	run:
 		# read in & index all seqs
-		with open (input.all_exp_seqs, 'r') as hndl:
+		with open (input.exp_seqs, 'r') as hndl:
 			exp_seqs_dict = SeqIO.to_dict (SeqIO.parse (hndl, 'fasta'))
 
 		# read in all cassette hits & gather list of all cassettes

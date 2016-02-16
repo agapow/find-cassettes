@@ -4,12 +4,21 @@ Perform custom data validation that is not covered by the root script.
 This script should be adapted (or commented out) for custom workflows.
 """
 
+### IMPORTS
+
+from Bio import SeqIO
+
+
+### CONSTANTS & DEFINES
+
+### CODE ###
 
 def get_seq_names (pth):
 	"""
 	Return a set of the names of sequenecs found in a file.
 	"""
-	return [s.name for s in SeqIO.parse (open (pth, 'r'), 'fasta')]
+	return frozenset ([s.name for s in SeqIO.parse (open (pth, 'r'), 'fasta')])
+
 
 # base file checks that experimental and control seqs don't overlap
 # the downreg and upreg sequences respectively
@@ -30,5 +39,6 @@ unchanged_names = get_seq_names ('data/seqs/comparative/unchanged.fasta')
 
 assert exp_names.isdisjoint (unchanged_names), "some unchanged in down"
 assert cntrl_names.isdisjoint (unchanged_names), "some unchanged in up"
+
 
 ### END ###

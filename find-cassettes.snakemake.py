@@ -68,13 +68,12 @@ RESULTS_DIR = 'results'
 # so we can get consistency of naming across analysis
 EXP_SUFF = 'experimental'
 CNTRL_SUFF = 'control'
-DISC_PREF = 'disc'
-NONDISC_PREF = 'nondisc'
-DISC_EXP_NAME = '%s-%s' % (EXP_SUFF, DISC_PREF)
-NONDISC_EXP_NAME = '%s-%s' % (EXP_SUFF, NONDISC_PREF)
-DISC_CNTRL_NAME = '%s-%s' % (CNTRL_SUFF, DISC_PREF)
-NONDISC_CNTRL_NAME = '%s-%s' % (CNTRL_SUFF, NONDISC_PREF)
-
+D_PREF = 'disc'
+ND_PREF = 'nondisc'
+D_EXP_NAME = '%s-%s' % (EXP_SUFF, D_PREF)
+ND_EXP_NAME = '%s-%s' % (EXP_SUFF, ND_PREF)
+D_CNTRL_NAME = '%s-%s' % (CNTRL_SUFF, D_PREF)
+ND_CNTRL_NAME = '%s-%s' % (CNTRL_SUFF, ND_PREF)
 
 # Validation of data
 VALIDATION_FLAG = path.join (BUILD_DIR, 'validation.done')
@@ -94,12 +93,13 @@ SEQ_WORK_DIR = path.join (BUILD_DIR, 'seqs')
 COMP_SEQ_WORK_DIR = path.join (SEQ_WORK_DIR, 'comparative')
 ALL_COMP_SEQ_DATA = glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta'))
 
-MTF_DISC_CONTROL_SEQS = path.join (SEQ_WORK_DIR, 'control-disc.fasta')
-NONDISC_CONTROL_SEQS = path.join (COMP_SEQ_WORK_DIR, 'control-nondisc.fasta')
+MTF_D_CNTRL_SEQS = path.join (SEQ_WORK_DIR, 'control-disc.fasta')
+ND_CNTRL_SEQS = path.join (COMP_SEQ_WORK_DIR, 'control-nondisc.fasta')
 
-MTF_DISC_EXP_SEQS = path.join (SEQ_WORK_DIR, 'experimental-disc.fasta')
-NONDISC_EXP_SEQS = path.join (COMP_SEQ_WORK_DIR, 'experimental-nondisc.fasta')
+MTF_D_EXP_SEQS = path.join (SEQ_WORK_DIR, 'experimental-disc.fasta')
+ND_EXP_SEQS = path.join (COMP_SEQ_WORK_DIR, 'experimental-nondisc.fasta')
 
+SEQS_PREPPED_FLAG = path.join (BUILD_DIR, 'seqs_prepped.done')
 
 SEQ_CNT_PTH = path.join (BUILD_DIR, 'seq_cnts.csv')
 
@@ -142,7 +142,6 @@ MOTIF_SUMMARY = path.join (RESULTS_DIR, 'motif-summary.csv')
 
 
 ## Cassette support
-
 CASS_SUPPORT_WORK_DIR = path.join (BUILD_DIR, 'cassette-support')
 CASS_SUPPORT_MAST_XML = path.join (CASS_SUPPORT_WORK_DIR, 'mast.xml')
 CASS_SUPPORT_MAST_JSON = CASS_SUPPORT_MAST_XML.replace ('.xml', '.json')
@@ -156,32 +155,39 @@ CASSETTE_SUPPORT_FIELDS = ('pattern', 'complement', 'frequency',
 ## Mast search for cassettes
 MAST_WORK_DIR = path.join (BUILD_DIR, 'mast')
 
-EXP_MAST_RES_DIR = path.join (MAST_WORK_DIR, DISC_EXP_NAME)
-CONTROL_MAST_RES_DIR = path.join (MAST_WORK_DIR, DISC_CNTRL_NAME)
-COMPARATIVE_MAST_RES_DIR = path.join (MAST_WORK_DIR, 'comparative')
+# EXP_MAST_RES_DIR = path.join (MAST_WORK_DIR, D_EXP_NAME)
+# CNTRL_MAST_RES_DIR = path.join (MAST_WORK_DIR, D_CNTRL_NAME)
+# COMPARATIVE_MAST_RES_DIR = path.join (MAST_WORK_DIR, 'comparative')
 
-EXP_MAST_RES = path.join (EXP_MAST_RES_DIR, 'mast.xml')
-CONTROL_MAST_RES = path.join (CONTROL_MAST_RES_DIR, 'mast.xml')
+ND_EXP_MAST_DIR = path.join (MAST_WORK_DIR, ND_EXP_NAME)
+ND_CNTRL_MAST_DIR = path.join (MAST_WORK_DIR, ND_CNTRL_NAME)
+ND_EXP_MAST_RES = path.join (ND_EXP_MAST_DIR, 'mast.xml')
+ND_CNTRL_MAST_RES = path.join (ND_CNTRL_MAST_DIR, 'mast.xml')
+ND_EXP_MAST_JSON = ND_EXP_MAST_RES.replace ('.xml', '.json')
+ND_CNTRL_MAST_JSON = ND_CNTRL_MAST_RES.replace ('.xml', '.json')
 
-EXP_MAST_JSON = EXP_MAST_RES.replace ('.xml', '.json')
-CONTROL_MAST_JSON = CONTROL_MAST_RES.replace ('.xml', '.json')
+ND_EXP_CASS_ALL = path.join (CASS_WORK_DIR, ND_EXP_NAME + '.all.csv')
+ND_CNTRL_CASS_ALL = path.join (CASS_WORK_DIR, ND_CNTRL_NAME + '.all.csv')
+#COMPARATIVE_CASS_DIR = path.join (CASS_WORK_DIR, 'comparative')
 
-EXP_CASS_ALL = path.join (CASS_WORK_DIR, DISC_EXP_NAME + '.all.csv')
-CONTROL_CASS_ALL = path.join (CASS_WORK_DIR, DISC_CNTRL_NAME + '.all.csv')
-COMPARATIVE_CASS_DIR = path.join (CASS_WORK_DIR, 'comparative')
+COMP_SEQ_MOTIF_SEARCH_FLAG = path.join (BUILD_DIR, 'cseq_mast_run.done')
+COMP_SEQ_MOTIF_POSTPROC_FLAG = path.join (BUILD_DIR, 'cseq_mast_postproc.done')
 
 CASS_HDRS = ['pattern', 'dir', 'seq_name', 'start', 'stop', 'len', 'max_gap',
 	'pvals', 'combined_pval']
 
 ## Summary tables
 # list of experimental seqs and which cass they contain
-EXP_CASS_SEQS = path.join (RESULTS_DIR, 'exp-seqs-and-cassettes.csv')
+ND_EXP_CASS_SEQS = path.join (RESULTS_DIR, 'nd-exp-seqs-and-cassettes.csv')
 
 MAX_CASS_GAP = config['cassettes']['max_gap']
 MAX_CASS_PVAL = config['cassettes']['max_pval']
 
-EXP_CASS_SUMMARY = EXP_CASS_ALL.replace ('.all.', '.summary.')
-CONTROL_CASS_SUMMARY = CONTROL_CASS_ALL.replace ('.all.', '.summary.')
+ND_EXP_CASS_ALL = path.join (CASS_WORK_DIR, ND_EXP_NAME + '.all.csv')
+ND_CNTRL_CASS_ALL = path.join (CASS_WORK_DIR, ND_CNTRL_NAME + '.all.csv')
+
+ND_EXP_CASS_SUMMARY = ND_EXP_CASS_ALL.replace ('.all.', '.summary.')
+ND_CNTRL_CASS_SUMMARY = ND_CNTRL_CASS_ALL.replace ('.all.', '.summary.')
 
 CASS_SUMMARY_HDRS = ['pattern', 'num_cassettes', 'num_seqs_with_cassettes', 'mean_cassettes',
 	'mean_cassette_dose']
@@ -262,10 +268,11 @@ rule prep_data:
 		all_cntrl_seqs=CNTRL_SEQ_DATA,
 		comp_seq_data_dir=COMP_SEQ_DATA_DIR,
 	output:
-		disc_exp_seqs=MTF_DISC_EXP_SEQS,
-		nondisc_exp_seqs=NONDISC_EXP_SEQS,
-		disc_cntrl_seqs=MTF_DISC_CONTROL_SEQS,
-		nondisc_control_seqs=NONDISC_CONTROL_SEQS,
+		touch (SEQS_PREPPED_FLAG),
+		disc_exp_seqs=MTF_D_EXP_SEQS,
+		nondisc_exp_seqs=ND_EXP_SEQS,
+		disc_cntrl_seqs=MTF_D_CNTRL_SEQS,
+		nondisc_control_seqs=ND_CNTRL_SEQS,
 		comp_seq_work_dir=COMP_SEQ_WORK_DIR,
 	run:
 		## Preconditions:
@@ -333,19 +340,18 @@ rule prep_data:
 rule count_seqs:
 	message: "Count the number of sequences in every file"
 	input:
-		disc_exp_seqs=MTF_DISC_EXP_SEQS,
-		nondisc_exp_seqs=NONDISC_EXP_SEQS,
-		disc_cntrl_seqs=MTF_DISC_CONTROL_SEQS,
-		nondisc_control_seqs=NONDISC_CONTROL_SEQS,
-		comp_seq_work_dir=COMP_SEQ_WORK_DIR,
+		SEQS_PREPPED_FLAG,
+		disc_exp_seqs=MTF_D_EXP_SEQS,
+		disc_cntrl_seqs=MTF_D_CNTRL_SEQS,
 	output:
 		seq_cnt_pth=SEQ_CNT_PTH
 	run:
 		# XXX: this is where a lot of naming stuff can come acrop
-		ALL_SEQ_FILES = ALL_COMP_SEQ_DATA + [
+
+		ALL_SEQ_FILES = [
 			input.disc_exp_seqs,
 			input.disc_cntrl_seqs,
-		]
+		] + glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta'))
 
 		cnts = []
 		for f in ALL_SEQ_FILES:
@@ -360,11 +366,12 @@ rule count_seqs:
 			hdr_flds=cnts[0].keys())
 
 
+
 rule prep_discrim_meme_search:
 	message: "Making priors for discrimination meme search"
 	input:
-		top100_exp_seqs=MTF_DISC_EXP_SEQS,
-		random100_cntrl_seqs=MTF_DISC_CONTROL_SEQS,
+		top100_exp_seqs=MTF_D_EXP_SEQS,
+		random100_cntrl_seqs=MTF_D_CNTRL_SEQS,
 	output:
 		meme_priors=MEME_PRIORS,
 	log: 'foo.log'
@@ -375,10 +382,11 @@ rule prep_discrim_meme_search:
 			exe=PSPGEN_EXE)
 
 
+
 rule meme_search:
 	message: "Looking for motifs with MEME using previous priors"
 	input:
-		disc_exp_seqs=MTF_DISC_EXP_SEQS,
+		disc_exp_seqs=MTF_D_EXP_SEQS,
 		meme_priors=MEME_PRIORS,
 	output:
 		meme_results=MEME_RESULTS,
@@ -387,6 +395,7 @@ rule meme_search:
 			input.meme_priors,
 			nmotifs=NUM_MOTIFS, minw=MIN_MOTIF_WIDTH, maxw=MAX_MOTIF_WIDTH,
 				exe=MEME_EXE)
+
 
 
 rule mine_for_cassettes:
@@ -505,7 +514,7 @@ rule calc_cassette_support:
 	input:
 		filtered_cassettes=FILTERED_CASSETTES,
 		meme_results=MEME_RESULTS,
-		disc_exp_seqs=MTF_DISC_EXP_SEQS,
+		disc_exp_seqs=MTF_D_EXP_SEQS,
 	output:
 		cassettes_with_support=CASSETTES_WITH_SUPPORT,
 		work_dir=CASS_SUPPORT_WORK_DIR,
@@ -612,25 +621,19 @@ rule graph_cassettes:
 
 
 rule mast_search_for_motifs:
-	message: "Search non-discovery & comparative data for motifs"
+	message: "Search comparative data (including non-discovery) for motifs"
 	input:
+		SEQS_PREPPED_FLAG,
 		filtered_cassettes=FILTERED_CASSETTES,
-		exp_seqs=NONDISC_EXP_SEQS,
-		control_seqs=NONDISC_CONTROL_SEQS,
 		meme_results=MEME_RESULTS,
 	output:
-		EXP_MAST_RES_DIR,
-		CONTROL_MAST_RES_DIR,
-		EXP_MAST_RES,
-		CONTROL_MAST_RES,
+		ND_EXP_MAST_RES,
+		ND_CNTRL_MAST_RES,
+		touch (COMP_SEQ_MOTIF_SEARCH_FLAG),
 	run:
 		## Constants:
 		# build list of data to analyse & where results go
-		ANALYSES = [
-			(input.exp_seqs, EXP_MAST_RES_DIR),
-			(input.control_seqs, CONTROL_MAST_RES_DIR),
-		]
-
+		ANALYSES = []
 		for pth in glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta')):
 			seq_dir, seq_name, seq_ext = mcda.path_to_dir_name_ext (pth)
 			ANALYSES.append ((pth, path.join (COMPARATIVE_MAST_RES_DIR, seq_name)))
@@ -643,26 +646,24 @@ rule mast_search_for_motifs:
 
 		for a in ANALYSES:
 			seq_file, output_dir = a
-			mcda.run_mast (input.meme_results, seq_file, output_dir, motif_ids=uniq_motifs_seen, exe=MAST_EXE)
+			mcda.run_mast (input.meme_results, seq_file, output_dir, exe=MAST_EXE)
 
 
 
 rule postprocess_mast_results:
 	message: "Manipulate the MAST results into a more readable form"
 	input:
-		exp_mast_results=EXP_MAST_RES,
-		control_mast_results=CONTROL_MAST_RES,
+		COMP_SEQ_MOTIF_SEARCH_FLAG,
+		ND_EXP_MAST_RES,
+		ND_CNTRL_MAST_RES,
 	output:
-		exp_mast_json=EXP_MAST_JSON,
-		control_mast_json=CONTROL_MAST_JSON,
+		touch (COMP_SEQ_MOTIF_POSTPROC_FLAG),
+		ND_EXP_MAST_JSON,
+		ND_CNTRL_MAST_JSON,
 	run:
 		## Constants:
 		# build list of data to analyse & where results go
-		ANALYSES = [
-			(input.exp_mast_results, output.exp_mast_json),
-			(input.control_mast_results, output.control_mast_json),
-		]
-
+		ANALYSES = []
 		for pth in glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta')):
 			seq_dir, seq_name, seq_ext = mcda.path_to_dir_name_ext (pth)
 			res_path = path.join (COMPARATIVE_MAST_RES_DIR, seq_name,
@@ -684,22 +685,17 @@ rule postprocess_mast_results:
 rule list_cassettes:
 	message: "Process mast results to list cassettes in total sequence sets"
 	input:
+		COMP_SEQ_MOTIF_POSTPROC_FLAG,
 		filtered_cassettes=FILTERED_CASSETTES,
-		exp_mast_json=EXP_MAST_JSON,
-		control_mast_json=CONTROL_MAST_JSON,
 	output:
-		exp_cass_all=EXP_CASS_ALL,
-		control_cass_all=CONTROL_CASS_ALL,
-		exp_cass_seqs=EXP_CASS_SEQS,
+		exp_cass_all=ND_EXP_CASS_ALL,
+		control_cass_all=ND_CNTRL_CASS_ALL,
+		exp_cass_seqs=ND_EXP_CASS_SEQS,
 	run:
 		#
 		## Constants:
 		# build list of data to analyse & where results go
-		ANALYSES = [
-			(input.exp_mast_json, output.exp_cass_all),
-			(input.control_mast_json, output.control_cass_all),
-		]
-
+		ANALYSES = []
 		for pth in glob (path.join (COMPARATIVE_MAST_RES_DIR, '*/mast.json')):
 			mast_dir, mast_file, mast_ext = mcda.path_to_dir_name_ext (pth)
 			par_dir = mast_dir.split ('/')[-1]
@@ -751,20 +747,16 @@ rule count_cassettes:
 	message: "Summarize cassette hit listings"
 	input:
 		filtered_cassettes=FILTERED_CASSETTES,
-		exp_cass_all=EXP_CASS_ALL,
-		control_cass_all=CONTROL_CASS_ALL,
+		exp_cass_all=ND_EXP_CASS_ALL,
+		control_cass_all=ND_CNTRL_CASS_ALL,
 		seq_cnts=SEQ_CNT_PTH,
 	output:
-		exp_cass_summary=EXP_CASS_SUMMARY,
-		control_cass_summary=CONTROL_CASS_SUMMARY,
+		exp_cass_summary=ND_EXP_CASS_SUMMARY,
+		control_cass_summary=ND_CNTRL_CASS_SUMMARY,
 	run:
 		## Constants:
 		# build list of data to analyse & where results go
-		ANALYSES = [
-			(input.exp_cass_all, output.exp_cass_summary),
-			(input.control_cass_all, output.control_cass_summary),
-		]
-
+		ANALYSES = []
 		for pth in glob (path.join (COMPARATIVE_CASS_DIR, '*.all.csv')):
 			summary_pth = pth.replace ('.all.', '.summary.')
 			ANALYSES.append ((pth, summary_pth))
@@ -818,8 +810,8 @@ rule tabulate_cassette_counts:
 	message: "Tabulate cassette hits into a single table"
 	input:
 		filtered_cassettes=FILTERED_CASSETTES,
-		exp_cass_summary=EXP_CASS_SUMMARY,
-		control_cass_summary=CONTROL_CASS_SUMMARY,
+		exp_cass_summary=ND_EXP_CASS_SUMMARY,
+		control_cass_summary=ND_CNTRL_CASS_SUMMARY,
 	output:
 		overall_cass_table=OVERALL_CASS_TABLE,
 	run:
@@ -882,16 +874,16 @@ rule make_summary_table:
 		PVAL_FLD_TMPL = '%s_pval'
 		QVAL_FLD_TMPL = '%s_qval'
 
-		CNTRL_CNT_FLD = CNT_FLD_TMPL % NONDISC_CNTRL_NAME
-		CNTRL_CASS_FLD = CASS_FLD_TMPL % NONDISC_CNTRL_NAME
-		CNTRL_FRAC_FLD = FRAC_FLD_TMPL % NONDISC_CNTRL_NAME
+		CNTRL_CNT_FLD = CNT_FLD_TMPL % ND_CNTRL_NAME
+		CNTRL_CASS_FLD = CASS_FLD_TMPL % ND_CNTRL_NAME
+		CNTRL_FRAC_FLD = FRAC_FLD_TMPL % ND_CNTRL_NAME
 
-		EXP_CNT_FLD = CNT_FLD_TMPL % NONDISC_EXP_NAME
-		EXP_CASS_FLD = CASS_FLD_TMPL % NONDISC_EXP_NAME
-		EXP_FRAC_FLD = FRAC_FLD_TMPL % NONDISC_EXP_NAME
-		EXP_ENR_FLD = ENR_FLD_TMPL % NONDISC_EXP_NAME
-		EXP_PVAL_FLD = PVAL_FLD_TMPL % NONDISC_EXP_NAME
-		EXP_QVAL_FLD = QVAL_FLD_TMPL % NONDISC_EXP_NAME
+		EXP_CNT_FLD = CNT_FLD_TMPL % ND_EXP_NAME
+		EXP_CASS_FLD = CASS_FLD_TMPL % ND_EXP_NAME
+		EXP_FRAC_FLD = FRAC_FLD_TMPL % ND_EXP_NAME
+		EXP_ENR_FLD = ENR_FLD_TMPL % ND_EXP_NAME
+		EXP_PVAL_FLD = PVAL_FLD_TMPL % ND_EXP_NAME
+		EXP_QVAL_FLD = QVAL_FLD_TMPL % ND_EXP_NAME
 
 		## Main:
 		# get counts of all types of sequences
@@ -915,7 +907,7 @@ rule make_summary_table:
 			EXP_QVAL_FLD
 		]
 		for k in list (seq_cnts.keys()):
-			if k not in [NONDISC_EXP_NAME, NONDISC_CNTRL_NAME]:
+			if k not in [ND_EXP_NAME, ND_CNTRL_NAME]:
 				fld_list.extend ([
 					CNT_FLD_TMPL % k,
 					CASS_FLD_TMPL % k,
@@ -964,7 +956,7 @@ rule make_summary_table:
 
 		# calculate enrichment & pval
 		for src in seq_cnts.keys():
-			if src != NONDISC_CNTRL_NAME:
+			if src != ND_CNTRL_NAME:
 				cnt_fld = CNT_FLD_TMPL % src
 				cass_fld = CASS_FLD_TMPL % src
 				frac_fld = FRAC_FLD_TMPL % src
@@ -983,7 +975,7 @@ rule make_summary_table:
 						raise
 
 		# calculate qval?
-		for c in (NONDISC_EXP_NAME,):
+		for c in (ND_EXP_NAME,):
 			in_col = "%s_pval" % c
 			out_col = "%s_qval" % c
 			print (r)
@@ -1024,8 +1016,8 @@ rule make_summary_table:
 rule extract_exemplars:
 	message: "Extract best examples of cassette sequences from experimental data"
 	input:
-		exp_seqs=NONDISC_EXP_SEQS,
-		all_exp_cass=EXP_CASS_ALL,
+		exp_seqs=ND_EXP_SEQS,
+		all_exp_cass=ND_EXP_CASS_ALL,
 	output:
 		exemplar_cass=EXEMPLAR_CASS,
 		exemplar_seqs=EXEMPLAR_SEQS,
@@ -1092,7 +1084,7 @@ rule report_results:
 		OVERALL_CASS_TABLE_WITH_STATS,
 		EXEMPLAR_SEQS,
 		EXEMPLAR_CASS,
-		EXP_CASS_SEQS,
+		ND_EXP_CASS_SEQS,
 		CASSETTE_GRAPH,
 		CASSETTES_WITH_SUPPORT,
 	output:
@@ -1136,7 +1128,7 @@ Input data
 
 * The control data was ``{CNTRL_SEQ_DATA}``.
 
-* The remainder of the control and experimental sequence sets not used for motif discovery is saved as "-nd".
+* The control and experimental sequence sets are split into discovery ("-{D_PREF}", motif and cassette discovery) and non-discovery ("-{ND_PREF}", cassette validation & enumeration) datasets.
 
 * The number of sequences in all files (including those to be used for comparative purposes) were:
 
@@ -1161,7 +1153,7 @@ Motifs were discovered in a discriminative analysis (experimental vs. control se
 
 * The size of motif searched for was {MIN_MOTIF_WIDTH} to {MAX_MOTIF_WIDTH}.
 
-* The first {MEME_SEQ_CNT} sequences of experimental and control sequences was used in the search.
+* The first {MEME_SEQ_CNT} sequences of experimental and control sequences were used in the search.
 
 * The following motifs were found:
 

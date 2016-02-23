@@ -636,7 +636,9 @@ rule mast_search_for_motifs:
 		ANALYSES = []
 		for pth in glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta')):
 			seq_dir, seq_name, seq_ext = mcda.path_to_dir_name_ext (pth)
-			ANALYSES.append ((pth, path.join (COMPARATIVE_MAST_RES_DIR, seq_name)))
+			ANALYSES.append (
+				(pth, path.join (MAST_WORK_DIR, seq_name))
+			)
 
 		## Main:
 		# calculate elements needed
@@ -666,7 +668,7 @@ rule postprocess_mast_results:
 		ANALYSES = []
 		for pth in glob (path.join (COMP_SEQ_WORK_DIR, '*.fasta')):
 			seq_dir, seq_name, seq_ext = mcda.path_to_dir_name_ext (pth)
-			res_path = path.join (COMPARATIVE_MAST_RES_DIR, seq_name,
+			res_path = path.join (MAST_WORK_DIR, seq_name,
 				'mast.xml')
 			json_pth = res_path.replace ('.xml', '.json')
 			ANALYSES.append ((res_path, json_pth))
@@ -696,10 +698,10 @@ rule list_cassettes:
 		## Constants:
 		# build list of data to analyse & where results go
 		ANALYSES = []
-		for pth in glob (path.join (COMPARATIVE_MAST_RES_DIR, '*/mast.json')):
+		for pth in glob (path.join (MAST_WORK_DIR, '*/mast.json')):
 			mast_dir, mast_file, mast_ext = mcda.path_to_dir_name_ext (pth)
 			par_dir = mast_dir.split ('/')[-1]
-			summary_pth = path.join (COMPARATIVE_CASS_DIR, '%s.all.csv' % par_dir)
+			summary_pth = path.join (CASS_WORK_DIR, '%s.all.csv' % par_dir)
 			ANALYSES.append ((pth, summary_pth))
 
 		## Main:
@@ -707,7 +709,7 @@ rule list_cassettes:
 		uniq_cassettes = mcda.read_csv_as_dicts (input.filtered_cassettes)
 		uniq_patterns = [r['pattern'] for r in uniq_cassettes]
 
-		mcda.ensure_dir_exists (COMPARATIVE_CASS_DIR)
+		mcda.ensure_dir_exists (CASS_WORK_DIR)
 
 		hdrs = ['seq'] + uniq_patterns
 
@@ -757,7 +759,7 @@ rule count_cassettes:
 		## Constants:
 		# build list of data to analyse & where results go
 		ANALYSES = []
-		for pth in glob (path.join (COMPARATIVE_CASS_DIR, '*.all.csv')):
+		for pth in glob (path.join (CASS_WORK_DIR, '*.all.csv')):
 			summary_pth = pth.replace ('.all.', '.summary.')
 			ANALYSES.append ((pth, summary_pth))
 
@@ -817,10 +819,12 @@ rule tabulate_cassette_counts:
 	run:
 		## Constants:
 		# build list of data to analyse
-		comp_summaries = [x for x in glob (path.join (COMPARATIVE_CASS_DIR,
+		comp_summaries = [x for x in glob (path.join (CASS_WORK_DIR,
 			'*.summary.csv'))]
-		all_summaries = [input.control_cass_summary, input.exp_cass_summary] + \
-			comp_summaries
+		assert input.control_cass_summary in comp_summaries, \
+			"control cassette summary not found"
+		assert input.exp_cass_summary in comp_summaries, \
+			"experimental cassette summary not found"
 
 		## Main:
 		# get list of all patterns
@@ -831,7 +835,7 @@ rule tabulate_cassette_counts:
 		# get counts for all of these from summaries
 		sources = []
 		all_freqs = {}
-		for f in all_summaries:
+		for f in comp_summaries:
 			src = mcda.get_file_name (f).replace ('.summary', '')
 			sources.append (src)
 			recs = mcda.read_csv_as_dicts (f)
@@ -872,7 +876,6 @@ rule make_summary_table:
 		FRAC_FLD_TMPL = '%s_frac'
 		ENR_FLD_TMPL = '%s_enr'
 		PVAL_FLD_TMPL = '%s_pval'
-		QVAL_FLD_TMPL = '%s_qval'
 
 		CNTRL_CNT_FLD = CNT_FLD_TMPL % ND_CNTRL_NAME
 		CNTRL_CASS_FLD = CASS_FLD_TMPL % ND_CNTRL_NAME
@@ -883,7 +886,6 @@ rule make_summary_table:
 		EXP_FRAC_FLD = FRAC_FLD_TMPL % ND_EXP_NAME
 		EXP_ENR_FLD = ENR_FLD_TMPL % ND_EXP_NAME
 		EXP_PVAL_FLD = PVAL_FLD_TMPL % ND_EXP_NAME
-		EXP_QVAL_FLD = QVAL_FLD_TMPL % ND_EXP_NAME
 
 		## Main:
 		# get counts of all types of sequences
@@ -900,14 +902,18 @@ rule make_summary_table:
 		# read the number of cassettes found in each seq set
 		cass_summaries = mcda.read_csv_as_dicts (input.overall_cass_table)
 
+		# build list oif files to be processed
+		all_seqsets = [x[1][0] for x in snakemake.utils.listfiles (path.join (
+			COMP_SEQ_WORK_DIR, '{name}.fasta'))]
+
 		# build list of fields for output (order is important)
 		fld_list = ['cassette',
 			CNTRL_CNT_FLD, CNTRL_CASS_FLD, CNTRL_FRAC_FLD,
 			EXP_CNT_FLD, EXP_CASS_FLD, EXP_FRAC_FLD, EXP_ENR_FLD, EXP_PVAL_FLD,
-			EXP_QVAL_FLD
 		]
-		for k in list (seq_cnts.keys()):
-			if k not in [ND_EXP_NAME, ND_CNTRL_NAME]:
+
+		for k in all_seqsets:
+			if k not in [ND_EXP_NAME, ND_CNTRL_NAME, D_EXP_NAME, D_CNTRL_NAME]:
 				fld_list.extend ([
 					CNT_FLD_TMPL % k,
 					CASS_FLD_TMPL % k,
@@ -932,21 +938,21 @@ rule make_summary_table:
 				else:
 					new_rec[CASS_FLD_TMPL % k] = int (r[k])
 
-			for k in list (seq_cnts.keys()):
+			for k in all_seqsets:
 				new_rec[CNT_FLD_TMPL % k] = int (seq_cnts[k])
 
 			cass_details.append (new_rec)
 		# mcda.prettyprint (cass_details[:2])
 
 		# annotate with seq counts & generate fraction
-		for src, cnt in seq_cnts.items():
+		for src in all_seqsets:
 			cnt_fld = CNT_FLD_TMPL % src
 			cass_fld = CASS_FLD_TMPL % src
 			frac_fld = FRAC_FLD_TMPL % src
 
 			for r in cass_details:
 				try:
-					r[cnt_fld] = int (cnt)
+					r[cnt_fld] = int (seq_cnts[src])
 					r[frac_fld] = r[cass_fld] / r[cnt_fld]
 				except:
 					print (cnt_fld, r[cnt_fld])
@@ -955,7 +961,7 @@ rule make_summary_table:
 					raise
 
 		# calculate enrichment & pval
-		for src in seq_cnts.keys():
+		for src in all_seqsets:
 			if src != ND_CNTRL_NAME:
 				cnt_fld = CNT_FLD_TMPL % src
 				cass_fld = CASS_FLD_TMPL % src
@@ -974,16 +980,16 @@ rule make_summary_table:
 						mcda.prettyprint (r)
 						raise
 
-		# calculate qval?
-		for c in (ND_EXP_NAME,):
-			in_col = "%s_pval" % c
-			out_col = "%s_qval" % c
-			print (r)
-			all_pvals = [r[in_col] for r in cass_details]
-			adj_pvals = multipletests (all_pvals, alpha=0.05, method='fdr_by')
-			qvals = adj_pvals[1]
-			for i in range (len (cass_details)):
-				cass_details[i][out_col] = qvals[i]
+		# # calculate qval?
+		# for c in (ND_EXP_NAME,):
+		# 	in_col = "%s_pval" % c
+		# 	out_col = "%s_qval" % c
+		# 	print (r)
+		# 	all_pvals = [r[in_col] for r in cass_details]
+		# 	adj_pvals = multipletests (all_pvals, alpha=0.05, method='fdr_by')
+		# 	qvals = adj_pvals[1]
+		# 	for i in range (len (cass_details)):
+		# 		cass_details[i][out_col] = qvals[i]
 
 		# save this all
 		mcda.write_csv_as_dicts (cass_details, output.table_with_stats,
@@ -1000,14 +1006,15 @@ rule make_summary_table:
 				for r in cass_details:
 					r[f] = '%0.3e' % r[f]
 
-		# first one with the seqs & counts & frac
-		cnt_fld_list = [f for f in fld_list if f.split('_')[-1] not in ('pval',
-			'enr')]
+		# first one with the counts & frac, seq cnts are in table above
+		cnt_fld_list = [f for f in fld_list if f.endswith ('_cass_cnt') or
+			f.endswith ('_frac')]
 		mcda.write_csv_as_dicts (cass_details, output.count_table,
 			cnt_fld_list)
 
 		# then one with the enr and pvals
-		enr_fld_list = [f for f in fld_list if f.split('_')[-1] not in ('cnt')]
+		enr_fld_list = [f for f in fld_list if f.endswith ('_enr') or
+			f.endswith ('_pval')]
 		mcda.write_csv_as_dicts (cass_details, output.enrichment_table,
 			enr_fld_list)
 
@@ -1194,7 +1201,7 @@ Cassette detection in all sequences
 
 	* The maximum p-value threshold for cassettes (based on combined p-value of constituent motifs) was: {MAX_CASS_PVAL}
 
-* The raw number of sequences with specific cassettes each dataset was:
+* The raw number of sequences with specific cassettes in each dataset was:
 
 	.. csv-table:: Cassettes in all sequence sets
 		:file: {OVERALL_CASS_TABLE}

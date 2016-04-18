@@ -230,7 +230,26 @@ def get_names_of_seqs_in_file (pth):
 	all_seqs = mcda.read_seqs (pth)
 	return [s.name for s in all_seqs]
 
+DIR_RE = re.compile (r'[\+\-]')
 
+def cass_str_len (cass_str):
+	"""
+	A conviencince function to count the motifs in a cassette string.
+	
+	Needed now that we can have more than 9 cassettes.
+	
+	For example::
+	
+		>>> cass_str_len ('1+')
+		1
+		>>> cass_str_len ('1+2-')
+		1
+		>>> cass_str_len ('9+10-11+')
+		2
+	"""
+	hits = DIR_RE.findall (cass_str)
+	return len (hits)
+	
 
 ## Snakemake rules
 
@@ -471,7 +490,7 @@ rule distill_cassette_results:
 		all_cassettes.reverse()
 		uniq_cassettes = []
 		for r in all_cassettes:
-			if 2 < len (r['pattern']):
+			if 2 < cass_str_len (r['pattern']):
 				curr_is_uniq = True
 				for u in uniq_cassettes:
 					if mcda.is_eq_or_complement (r['pattern'], u['pattern']):
@@ -786,24 +805,29 @@ rule count_cassettes:
 			analysis_name = name_match.group(1)
 
 			for u in uniq_patterns:
-				hits = [x['seq_name'] for x in all_cass if x['pattern'] == u]
-				# NOTE: very important! we count the frequency (all hits) and the
-				# 'num_seqs_with_cassettes' or the frequency of sequences containing at least 1
-				# example cassette
-				num_hits = len (hits)
-				num_seqs_with_hits = len (set (hits))
-				num_seqs = seq_cnts[analysis_name]
-				tally = Counter (hits)
-				sum_cass = sum (list (tally.values()))
-				mean_cass = sum_cass / num_seqs
-				mean_cass_dose = sum_cass / num_seqs_with_hits
-				summary_recs.append ({
-					'pattern': u,
-					'num_cassettes': num_hits,
-					'num_seqs_with_cassettes': num_seqs_with_hits,
-					'mean_cassettes': mean_cass,
-					'mean_cassette_dose': mean_cass_dose,
-				})
+				try:
+					hits = [x['seq_name'] for x in all_cass if x['pattern'] == u]
+					# NOTE: very important! we count the frequency (all hits) and the
+					# 'num_seqs_with_cassettes' or the frequency of sequences containing at least 1
+					# example cassette
+					num_hits = len (hits)
+					num_seqs_with_hits = len (set (hits))
+					num_seqs = seq_cnts[analysis_name]
+					tally = Counter (hits)
+					sum_cass = sum (list (tally.values()))
+					mean_cass = sum_cass / num_seqs
+					mean_cass_dose = sum_cass / num_seqs_with_hits
+					summary_recs.append ({
+						'pattern': u,
+						'num_cassettes': num_hits,
+						'num_seqs_with_cassettes': num_seqs_with_hits,
+						'mean_cassettes': mean_cass,
+						'mean_cassette_dose': mean_cass_dose,
+					})
+				except Exception as err:
+					print (err)
+					print ("Looking at %s for %s" % (analysis_name, u))
+					raise
 			mcda.write_csv_as_dicts (summary_recs, s, CASS_SUMMARY_HDRS)
 
 
@@ -1007,13 +1031,13 @@ rule make_summary_table:
 					r[f] = '%0.3e' % r[f]
 
 		# first one with the counts & frac, seq cnts are in table above
-		cnt_fld_list = [f for f in fld_list if f.endswith ('_cass_cnt') or
+		cnt_fld_list = ['cassette'] + [f for f in fld_list if f.endswith ('_cass_cnt') or
 			f.endswith ('_frac')]
 		mcda.write_csv_as_dicts (cass_details, output.count_table,
 			cnt_fld_list)
 
 		# then one with the enr and pvals
-		enr_fld_list = [f for f in fld_list if f.endswith ('_enr') or
+		enr_fld_list = ['cassette'] + [f for f in fld_list if f.endswith ('_enr') or
 			f.endswith ('_pval')]
 		mcda.write_csv_as_dicts (cass_details, output.enrichment_table,
 			enr_fld_list)

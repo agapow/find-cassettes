@@ -20,6 +20,7 @@ cassettes:
    max_gap: ~
    max_pval: 1.0e-5
    randomizations: 1000
+   min_len: 2
 
 # extraction of exemplar sequences
 exemplars:

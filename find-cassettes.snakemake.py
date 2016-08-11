@@ -238,11 +238,11 @@ DIR_RE = re.compile (r'[\+\-]')
 def cass_str_len (cass_str):
 	"""
 	A conviencince function to count the motifs in a cassette string.
-
+	
 	Needed now that we can have more than 9 cassettes.
-
+	
 	For example::
-
+	
 		>>> cass_str_len ('1+')
 		1
 		>>> cass_str_len ('1+2-')
@@ -252,7 +252,7 @@ def cass_str_len (cass_str):
 	"""
 	hits = DIR_RE.findall (cass_str)
 	return len (hits)
-
+	
 
 ## Snakemake rules
 
